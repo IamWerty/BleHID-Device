@@ -6,13 +6,12 @@
 #define CALIBRATION_H
 
 #include <Arduino.h>
-#include "MPU6050.h"
+#include <BMI160Gen.h>
 #include "config.h"
 
 // ============================================================================
 // EXTERNAL VARIABLES
 // ============================================================================
-extern MPU6050 mpu;
 extern GyroData gyro;
 extern Buttons btn;
 extern unsigned long lastCalibrationTime;
@@ -22,17 +21,18 @@ extern unsigned long lastCalibrationTime;
 // ============================================================================
 
 void calibrateGyro() {
-  const int samples = 1000;
+  const int samples = 100;
   long sumX = 0, sumY = 0, sumZ = 0;
   
   Serial.println("Калібрування... Тримайте нерухомо!");
   
   for (int i = 0; i < samples; i++) {
     int16_t ax, ay, az, gx, gy, gz;
-    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    BMI160.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
     sumX += gx;
     sumY += gy;
     sumZ += gz;
+    if (i == 0) Serial.println("Перше зчитування OK");
     delay(2);
   }
   

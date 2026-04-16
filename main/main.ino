@@ -1,12 +1,12 @@
 /**
  * ESP32 Airmouse
- * Necessary Hardware: ESP32-C3, MPU6050, 4 buttons
+ * Necessary Hardware: ESP32-C3, BMI160, 4 buttons
  */
 
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
 #include <Wire.h>
-#include "MPU6050.h"
+#include <BMI160Gen.h>  // Замість MPU6050.h
 
 // Project headers
 #include "config.h"
@@ -28,7 +28,7 @@ NimBLEHIDDevice* hid;
 NimBLECharacteristic* inputMouse;
 
 // SENSORS
-MPU6050 mpu;
+// "MPU6050 mpu" більше не потрібен, BMI160Gen використовується як синглтон через BMI160
 GyroData gyro;
 
 // STATUSES
@@ -48,27 +48,33 @@ bool rightHeld = false;
 uint8_t currentButtons = 0;
 
 // ============================================================================
-// MPU6050 INITIALIZATION
+// BMI160 INITIALIZATION
 // ============================================================================
 
-void initMPU6050() {
-  Wire.begin(8, 9);
-  Serial.println("Ініціалізація MPU6050...");
-  
-  mpu.initialize();
-  
-  if (!mpu.testConnection()) {
-    Serial.println("Помилка: MPU6050 не знайдено!");
+void initBMI160() {
+  Wire.begin(8, 9);  // SDA=8, SCL=9 — ті самі піни, що були для MPU6050
+  Serial.println("Ініціалізація BMI160...");
+
+  // Адреса I2C: 0x68 (SA0→GND) або 0x69 (SA0→VCC)
+  if (!BMI160.begin(BMI160GenClass::I2C_MODE, 0x68)) {
+    Serial.println("Помилка: BMI160 не знайдено!");
     while (1) {
       digitalWrite(LED_PIN, !digitalRead(LED_PIN));
       delay(100);
     }
   }
+  // Аналог mpu.setDLPFMode(3) — встановлюємо частоту 100 Гц (~44 Гц смуга фільтра)
+  BMI160.setGyroRate(BMI160_GYRO_RATE_100HZ);
+  BMI160.setAccelerometerRate(BMI160_ACCEL_RATE_100HZ);
 
-  mpu.setDLPFMode(3);
+  // Діапазони (за замовчуванням: ±250°/с для гіро, ±2g для акселя)
+  BMI160.setGyroRange(250);
+  BMI160.setAccelerometerRange(2);
+
+  delay(100);
   calibrateGyro();
-  
-  Serial.println("MPU6050 готово!");
+
+  Serial.println("BMI160 готово!");
 }
 
 // ============================================================================
@@ -81,7 +87,7 @@ void initPins() {
   pinMode(BTN_RCLICK, INPUT_PULLUP);
   pinMode(BTN_LCLICK, INPUT_PULLUP);
   pinMode(BTN_CONTROL, INPUT_PULLUP);
-  
+
   attachInterrupt(digitalPinToInterrupt(BTN_CONTROL), handleControlInterrupt, FALLING);
 }
 
@@ -92,11 +98,11 @@ void initPins() {
 void setup() {
   Serial.begin(115200);
   setCpuFrequencyMhz(80);
-  
+
   initPins();
   initBLE();
-  initMPU6050();
-  
+  initBMI160();  // Замість initMPU6050()
+
   lastMicros = micros();
   lastCalibrationTime = millis();
 
@@ -120,8 +126,8 @@ void loop() {
   lastMicros = now;
 
   // Update buttons state
-  btn.move = (digitalRead(BTN_MOVE) == HIGH);
-  btn.left = (digitalRead(BTN_LCLICK) == LOW);
+  btn.move  = (digitalRead(BTN_MOVE)   == HIGH);
+  btn.left  = (digitalRead(BTN_LCLICK) == LOW);
   btn.right = (digitalRead(BTN_RCLICK) == LOW);
 
   // Control button handle
@@ -131,16 +137,14 @@ void loop() {
   checkPeriodicCalibration();
   handleAutoCalibration();
 
-  // Data read from MPU6050
+  // Читання даних з BMI160 (аналог mpu.getMotion6)
   int16_t ax, ay, az, gx, gy, gz;
-  mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  
-  // Subtraction offset
+  BMI160.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+
   gx -= gyro.offsetX;
   gy -= gyro.offsetY;
   gz -= gyro.offsetZ;
 
-  // Low-pass filter
   gyro.filteredX = cfg.alpha * gyro.filteredX + (1 - cfg.alpha) * gx;
   gyro.filteredY = cfg.alpha * gyro.filteredY + (1 - cfg.alpha) * gy;
 
@@ -156,4 +160,4 @@ void loop() {
 
   // Clicks handle
   handleClicks(btn.left, btn.right, btn.move);
-}
+} 
