@@ -15,6 +15,20 @@
 extern Config cfg;
 
 // ============================================================================
+// BTN_MOVE ISR
+// ============================================================================
+
+volatile bool moveState = false;
+static volatile unsigned long lastMoveInterruptTime = 0;
+
+void IRAM_ATTR moveISR() {
+  unsigned long now = millis();
+  if (now - lastMoveInterruptTime < DEBOUNCE_DELAY) return;
+  lastMoveInterruptTime = now;
+  moveState = (digitalRead(BTN_MOVE) == HIGH);  // TTP223: активний рівень HIGH
+}
+
+// ============================================================================
 // MOVEMENT HANDLER
 // ============================================================================
 
