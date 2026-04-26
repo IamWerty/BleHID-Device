@@ -20,8 +20,8 @@ extern Config cfg;
 
 bool handleMovement(float gx, float gy, float gz, float dt) {
   // Convertation to degrees per second
-  float gx_dps = -gz / 131.0;
-  float gy_dps = -gx / 131.0;
+  float gx_dps = -gz;
+  float gy_dps = gx;
   
   // Dynamic threshold and sensitivity
   float avgRate = (abs(gx_dps) + abs(gy_dps)) / 2.0;
@@ -56,7 +56,7 @@ bool handleMovement(float gx, float gy, float gz, float dt) {
 // ============================================================================
 
 void handleScroll(float gx, float gy, float dt) {
-  float gy_dps = -gx / 131.0;
+  float gy_dps = gx;
   
   // Filtration
   static float filteredRate = 0;

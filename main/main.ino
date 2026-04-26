@@ -6,7 +6,7 @@
 #include <NimBLEDevice.h>
 #include <NimBLEHIDDevice.h>
 #include <Wire.h>
-#include <BMI160Gen.h>  // Замість MPU6050.h
+#include <BMI160.h>
 
 // Project headers
 #include "config.h"
@@ -28,7 +28,8 @@ NimBLEHIDDevice* hid;
 NimBLECharacteristic* inputMouse;
 
 // SENSORS
-// "MPU6050 mpu" більше не потрібен, BMI160Gen використовується як синглтон через BMI160
+BMI160 BMI;
+Offset off;
 GyroData gyro;
 
 // STATUSES
@@ -52,28 +53,11 @@ uint8_t currentButtons = 0;
 // ============================================================================
 
 void initBMI160() {
-  Wire.begin(8, 9);  // SDA=8, SCL=9 — ті самі піни, що були для MPU6050
+  Wire.begin(8, 9);  // SDA=8, SCL=9
   Serial.println("Ініціалізація BMI160...");
-
-  // Адреса I2C: 0x68 (SA0→GND) або 0x69 (SA0→VCC)
-  if (!BMI160.begin(BMI160GenClass::I2C_MODE, 0x68)) {
-    Serial.println("Помилка: BMI160 не знайдено!");
-    while (1) {
-      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-      delay(100);
-    }
-  }
-  // Аналог mpu.setDLPFMode(3) — встановлюємо частоту 100 Гц (~44 Гц смуга фільтра)
-  BMI160.setGyroRate(BMI160_GYRO_RATE_100HZ);
-  BMI160.setAccelerometerRate(BMI160_ACCEL_RATE_100HZ);
-
-  // Діапазони (за замовчуванням: ±250°/с для гіро, ±2g для акселя)
-  BMI160.setGyroRange(250);
-  BMI160.setAccelerometerRange(2);
-
-  delay(100);
-  calibrateGyro();
-
+  BMI.init(4, 500);       // +-4g, +-500 degrees per second
+  BMI.connectionTest();
+  calibrateGyro();        // off заповнюється всередині calibrateGyro()
   Serial.println("BMI160 готово!");
 }
 
@@ -138,21 +122,18 @@ void loop() {
   handleAutoCalibration();
 
   // Читання даних з BMI160 (аналог mpu.getMotion6)
-  int16_t ax, ay, az, gx, gy, gz;
-  BMI160.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-
-  gx -= gyro.offsetX;
-  gy -= gyro.offsetY;
-  gz -= gyro.offsetZ;
-
-  gyro.filteredX = cfg.alpha * gyro.filteredX + (1 - cfg.alpha) * gx;
-  gyro.filteredY = cfg.alpha * gyro.filteredY + (1 - cfg.alpha) * gy;
+  SensorData d = BMI.readCalibrated(off);
+  
+  // Low-pass filter
+  gyro.filteredX = cfg.alpha * gyro.filteredX + (1 - cfg.alpha) * d.gx;
+  gyro.filteredY = cfg.alpha * gyro.filteredY + (1 - cfg.alpha) * d.gy;
+  gyro.filteredZ = cfg.alpha * gyro.filteredZ + (1 - cfg.alpha) * d.gz;
 
   // MOVE/SCROLL handle
   if (mode == SCROLL && btn.move) {
     handleScroll(gyro.filteredX, gyro.filteredY, dt);
   } else if (btn.move) {
-    bool moved = handleMovement(gyro.filteredX, gyro.filteredY, gz, dt);
+    bool moved = handleMovement(gyro.filteredX, gyro.filteredY, gyro.filteredZ, dt);
     if (moved) {
       lastMoveTime = millis();
     }

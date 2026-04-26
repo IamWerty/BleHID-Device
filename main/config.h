@@ -54,6 +54,7 @@ struct GyroData {
   long offsetZ = 0;
   float filteredX = 0;
   float filteredY = 0;
+  float filteredZ = 0;
 };
 
 struct ControlButton {
