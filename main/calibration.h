@@ -6,42 +6,26 @@
 #define CALIBRATION_H
 
 #include <Arduino.h>
-#include "MPU6050.h"
+#include "BMI160.h"
 #include "config.h"
 
 // ============================================================================
 // EXTERNAL VARIABLES
 // ============================================================================
-extern MPU6050 mpu;
-extern GyroData gyro;
-extern Buttons btn;
+extern BMI160 BMI;
+extern Offset off;
 extern unsigned long lastCalibrationTime;
+extern Buttons btn;
 
 // ============================================================================
 // CALIBRATION FUNCTIONS
 // ============================================================================
 
 void calibrateGyro() {
-  const int samples = 1000;
-  long sumX = 0, sumY = 0, sumZ = 0;
-  
   Serial.println("Калібрування... Тримайте нерухомо!");
-  
-  for (int i = 0; i < samples; i++) {
-    int16_t ax, ay, az, gx, gy, gz;
-    mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    sumX += gx;
-    sumY += gy;
-    sumZ += gz;
-    delay(2);
-  }
-  
-  gyro.offsetX = sumX / samples;
-  gyro.offsetY = sumY / samples;
-  gyro.offsetZ = sumZ / samples;
-  
+  off = BMI.calibrate();  // calibrate() вже усереднює 500 семплів і повертає Offset
   Serial.println("Калібрування завершено!");
-  Serial.printf("Офсети: gx=%ld, gy=%ld, gz=%ld\n", gyro.offsetX, gyro.offsetY, gyro.offsetZ);
+  Serial.printf("Офсети: gx=%.4f, gy=%.4f, gz=%.4f\n", off.gx, off.gy, off.gz);
 }
 
 void handleAutoCalibration() {
@@ -51,18 +35,18 @@ void handleAutoCalibration() {
   if (!btn.move && !movePressedPrev && lastInactive == 0) {
     lastInactive = millis();
   }
-  
+
   if (btn.move) {
     lastInactive = 0;
   }
-  
+
   if (lastInactive > 0 && (millis() - lastInactive > AUTO_CALIBRATION_DELAY)) {
     Serial.println("Автокалібрування (60 с неактивності)...");
     calibrateGyro();
     lastCalibrationTime = millis();
     lastInactive = 0;
   }
-  
+
   movePressedPrev = btn.move;
 }
 
