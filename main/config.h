@@ -42,7 +42,8 @@ struct Config {
   float baseSensitivityX = 18.0;
   float baseSensitivityY = 22.0;
   float baseThreshold = 2.0;
-  float scrollSensitivity = 0.5;
+  float scrollSensitivityV = 0.5; // Vertical
+  float scrollSensitivityH = 0.5; // Horizontal
   int maxScroll = 3;
   float alpha = 0.8;
   unsigned long clickDelayAfterMove = 200;

@@ -53,4 +53,12 @@ void mouseScroll(signed char wheel) {
   sendMouse(currentButtons, 0, 0, wheel, 0);
 }
 
+void mouseScrollH(signed char hWheel) {
+  sendMouse(currentButtons, 0, 0, 0, hWheel);
+}
+
+void mouseScrollXY(signed char wheel, signed char hWheel) {
+  sendMouse(currentButtons, 0, 0, wheel, hWheel);
+}
+
 #endif
